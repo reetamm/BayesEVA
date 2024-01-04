@@ -16,7 +16,7 @@ mat <- diag(c(10000, 100, 0.25))
 pr.strm <- prior.norm(mean = c(0,0,0), cov = mat, trendsd = 0)
 n <- 11000 ; t0 <- mle.fit$estimate ; s <- mle.fit$std.err ; b <- 1000
 # s[2] = log(s[2]); t0[2] = log(t0[2])
-rn.post <- posterior(n, t0, pr.strm, "gpd", data = y, burn = b,psd=s)
+rn.post <- posterior(n, t0, pr.strm, "gev", data = y, burn = b,psd=s)
 summary(rn.post)
 
 par(mfrow=c(1,3))
@@ -28,9 +28,9 @@ par(mfrow=c(1,1))
 
 thresh = aggregate(tmax,list(years),FUN=quantile,0.95)
 summary(thresh[,2])
-y = tmax[tmax>99]
+y = tmax[tmax>95]
 length(y)
-mle.fit = fgpd(y,u=99)
+mle.fit = fgpd(y,u=9)
 mle.fit$mle
 mle.fit$se
 
