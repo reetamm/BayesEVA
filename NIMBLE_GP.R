@@ -38,23 +38,23 @@ assign('dgpd', dgpd, .GlobalEnv)
 data(Fort)
 FortMax <- aggregate(Prec ~ year, data = Fort, max)
 
-gev_model <- fevd(FortMax$Prec, type = 'GEV')
 gpd_model = fevd(x=Prec,data=Fort,threshold = 0.23,type = 'GP')
+
 FortGPD = Fort$Prec[Fort$Prec>0.23]
 code <- nimbleCode({
     # likelihood
     for(i in 1:n) {
-        y[i] ~ dgpd(mu, sigma, xi)
+        y[i] ~ dgpd(mu, sig, xi)
     }
     
     # priors
     # mu ~ dflat()
-    sigma ~ dunif(0, 100)
-    xi ~ dunif(-1, 1)
+    log(sig) ~ dnorm(-1, 1)
+    xi ~ dnorm(0, .5)
 })
 
 inits <- as.list(gpd_model$results$par)
-names(inits) <- c('sigma', 'xi')
+names(inits) <- c('log_sig', 'xi')
 constants = list(n = length(FortGPD), mu=0.23)
 
 model <- nimbleModel(code, data = list(y = FortGPD), inits = inits,
@@ -64,9 +64,16 @@ output <- nimbleMCMC(code = code, data = list(y = FortGPD),
                      inits = inits, niter = 11000, nburnin = 1000,
                      nchains = 2, summary = T, setSeed = 303*c(1:2))
 output$summary
+output$samples$chain1[,1] = exp(output$samples$chain1[,1])
+output$samples$chain2[,1] = exp(output$samples$chain2[,1])
+all.chains = do.call(rbind,output$samples)
+dim(all.chains)
+apply(all.chains,2,mean)
+apply(all.chains,2,sd)
+apply(all.chains,2,quantile,c(0.025,0.975))
 
 coda_samples = post_convert(output$samples)
-plot(coda_samples)
+# plot(coda_samples)
 geweke.diag(coda_samples)
 gelman.diag(coda_samples)
 effectiveSize(coda_samples)
