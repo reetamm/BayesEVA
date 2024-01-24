@@ -41,9 +41,9 @@ code <- nimbleCode({
         y[i] ~ dgev(mu, sig, xi)
     }
     # priors
-    mu ~ dnorm(0, 10)
-    log(sig) ~ dnorm(-1, 1)
-    xi ~ dnorm(0, .5)
+    mu ~ dnorm(0, sd=10)
+    log(sig) ~ dnorm(-1, sd=1)
+    xi ~ dnorm(0, sd = .5)
 })
 
 inits <- as.list(gev_model$results$par)
