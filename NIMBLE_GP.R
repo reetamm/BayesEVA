@@ -1,5 +1,4 @@
 rm(list = ls())
-library(methods)  # otherwise new() not being found - weird
 library(nimble)
 library(extRemes)
 
@@ -36,11 +35,34 @@ rgpd <- nimbleFunction(
 
 assign('dgpd', dgpd, .GlobalEnv)
 data(Fort)
-FortMax <- aggregate(Prec ~ year, data = Fort, max)
 
-gpd_model = fevd(x=Prec,data=Fort,threshold = 0.23,type = 'GP')
+## See monthly precip
+Fortmonth <- aggregate(Prec ~ month, data = Fort, mean)
+Fortmonth
 
-FortGPD = Fort$Prec[Fort$Prec>0.23]
+# Subset the wet months
+Fortwet = Fort[Fort$month %in% 4:9,]
+head(Fortwet)
+
+# Check autocorrelation
+qq = quantile(Fortwet$Prec,0.95)
+tmp1 <- tmp2 <- 0
+n = nrow(Fortwet)
+prec = Fortwet$Prec
+for(i in 2:n){
+    if(prec[i]>qq & prec[i-1]>qq)
+        tmp1 = tmp1 + 1
+    if(prec[i]>qq & prec[i-1]<=qq)
+        tmp2 = tmp2 + 1
+}
+tmp1/sum(prec>qq)
+tmp2/sum(prec<=qq)
+
+gpd_model = fevd(x=Prec,data=Fortwet,threshold = qq,type = 'GP')
+
+FortGPD = Fortwet$Prec[Fortwet$Prec>qq]
+# acf(FortGPD)
+
 code <- nimbleCode({
     # likelihood
     for(i in 1:n) {
@@ -48,21 +70,20 @@ code <- nimbleCode({
     }
     
     # priors
-    # mu ~ dflat()
-    log(sig) ~ dnorm(-1, 1)
-    xi ~ dnorm(0, .5)
+    log(sig) ~ dnorm(0, sd = 2)
+    xi ~ dnorm(0, sd = .5)
 })
 
 inits <- as.list(gpd_model$results$par)
 names(inits) <- c('log_sig', 'xi')
-constants = list(n = length(FortGPD), mu=0.23)
+constants = list(n = length(FortGPD), mu=qq)
 
 model <- nimbleModel(code, data = list(y = FortGPD), inits = inits,
                      constants = constants)
 output <- nimbleMCMC(code = code, data = list(y = FortGPD),
                      constants = constants,
                      inits = inits, niter = 11000, nburnin = 1000,
-                     nchains = 2, summary = T, setSeed = 303*c(1:2))
+                     nchains = 2, summary = T, setSeed = 2:3)
 output$summary
 output$samples$chain1[,1] = exp(output$samples$chain1[,1])
 output$samples$chain2[,1] = exp(output$samples$chain2[,1])
@@ -73,7 +94,49 @@ apply(all.chains,2,sd)
 apply(all.chains,2,quantile,c(0.025,0.975))
 
 coda_samples = post_convert(output$samples)
-# plot(coda_samples)
+plot(coda_samples)
 geweke.diag(coda_samples)
 gelman.diag(coda_samples)
 effectiveSize(coda_samples)
+
+
+#
+n   <- 1000              # Number of observations
+S   <- 2000             # Number of MCMC samples
+Y   <- FortGPD
+indx = sample(1:20000,2000)
+samps <- all.chains[indx,]
+
+# Compute PPD summaries
+tau <- seq(0.05,0.95,0.05)
+nt  <- length(tau)
+Qp     <- matrix(0,S,nt)
+for(s in 1:S){
+    Yp     <- evd::rgpd(n,qq,samps[s,1],samps[s,2])
+    Qp[s,] <- quantile(Yp,tau)
+}
+
+# Compute p-values
+Q    <- quantile(Y,tau)
+pval <- rep(0,nt)
+for(j in 1:nt){pval[j]<-mean(Qp[,j]>Q[j])}
+
+# I know you could do this in 5 mins, but anyways I coded up the computation of the PPD and Bayes p-value plot.  I'm thinking a side-by-side plot with the PPD on the left and pvals on the right.
+
+
+# Plot PPD
+pdf(file='plots/PPD_GP.pdf',width=6,height = 5)
+par(mar = c(5,5,2,1))
+boxplot(t(Qp)~tau,outline=FALSE,ylim=range(Qp),
+        cex.axis=1.5,cex.lab=1.5,
+        xlab="Quantile level",ylab="Posterior predictive distribution")
+points(Q,pch=19,col='blue',cex=0.5)
+legend("topleft",c("PPD","Observed"),cex=1.5,pch=c(15,19),col=c("gray","blue"),bty="n")
+par(mar = c(5,5,5,5))
+dev.off()
+
+# Plot p-values
+plot(tau,pval,xlab="Quantile level",ylab="Bayesian p-value",
+     cex.lab=1.5,cex.axis=1.5,ylim=0:1)
+
+

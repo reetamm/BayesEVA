@@ -31,7 +31,7 @@ rgev <- nimbleFunction(
     })
 
 data(Fort)
-FortMax <- aggregate(Prec ~ year, data = Fort, max)
+FortMax <- aggregate(Prec ~ year, data = Fort, FUN = max)
 gev_model <- fevd(FortMax$Prec, type = 'GEV')
 # gev_model$results$par[2] = log(gev_model$results$par[2])
 
@@ -42,7 +42,7 @@ code <- nimbleCode({
     }
     # priors
     mu ~ dnorm(0, sd=10)
-    log(sig) ~ dnorm(-1, sd=1)
+    log(sig) ~ dnorm(0, sd=2)
     xi ~ dnorm(0, sd = .5)
 })
 
@@ -52,7 +52,7 @@ names(inits) <- c('mu', 'log_sig', 'xi')
 output <- nimbleMCMC(code = code, data = list(y = FortMax$Prec),
                      constants = list(n = length(FortMax$Prec)),
                      inits = inits, niter = 11000, nburnin = 1000,
-                     nchains = 2, summary = T, setSeed = 303*c(1:2))
+                     nchains = 2, summary = T, setSeed = 2:3)
 output$summary
 output$samples$chain1[,1] = exp(output$samples$chain1[,1])
 output$samples$chain2[,1] = exp(output$samples$chain2[,1])
@@ -76,10 +76,51 @@ gelman.diag(coda_samples)
 effectiveSize(coda_samples)
 
 par(mfrow=c(1,3))
-plot(1:10000,all.chains[1:10000,2],'l',col='blue',xlab = 'Iteration',ylab = expression(mu))
+plot(1:10000,all.chains[1:10000,2],'l',col='blue',xlab = 'Iteration',ylab = expression(mu),cex.axis=1.5,cex.lab=2)
 lines(1:10000,all.chains[10001:20000,2],col='red')
-plot(1:10000,all.chains[1:10000,1],'l',col='blue',xlab = 'Iteration',ylab = expression(sigma))
+plot(1:10000,all.chains[1:10000,1],'l',col='blue',xlab = 'Iteration',ylab = expression(sigma),cex.axis=1.5,cex.lab=2)
 lines(1:10000,all.chains[10001:20000,1],col='red')
-plot(1:10000,all.chains[1:10000,3],'l',col='blue',xlab = 'Iteration',ylab = expression(xi))
+plot(1:10000,all.chains[1:10000,3],'l',col='blue',xlab = 'Iteration',ylab = expression(xi),cex.axis=1.5,cex.lab=2)
 lines(1:10000,all.chains[10001:20000,3],col='red')
 par(mfrow=c(1,1))
+
+
+#
+n   <- 10000              # Number of observations
+S   <- 2000             # Number of MCMC samples
+Y   <- FortMax$Prec
+indx = sample(1:20000,2000)
+samps <- all.chains[indx,]
+
+# Compute PPD summaries
+tau <- seq(0.05,0.95,0.05)
+nt  <- length(tau)
+Qp     <- matrix(0,S,nt)
+for(s in 1:S){
+    Yp     <- evd::rgev(n,samps[s,2],samps[s,1],samps[s,3])
+    Qp[s,] <- quantile(Yp,tau)
+}
+
+# Compute p-values
+Q    <- quantile(Y,tau)
+pval <- rep(0,nt)
+for(j in 1:nt){pval[j]<-mean(Qp[,j]>Q[j])}
+
+# I know you could do this in 5 mins, but anyways I coded up the computation of the PPD and Bayes p-value plot.  I'm thinking a side-by-side plot with the PPD on the left and pvals on the right.
+
+
+# Plot PPD
+pdf(file='plots/PPD_GEV.pdf',width=6,height = 5)
+par(mar = c(5,5,2,1))
+boxplot(t(Qp)~tau,outline=FALSE,ylim=range(Qp),
+        cex.axis=1.5,cex.lab=1.5,
+        xlab="Quantile level",ylab="Posterior predictive distribution")
+points(Q,pch=19,col='blue',cex=0.5)
+legend("topleft",c("PPD","Observed"),cex=1.5,pch=c(15,19),col=c("gray","blue"),bty="n")
+par(mar = c(5,5,5,5))
+dev.off()
+
+# Plot p-values
+plot(tau,pval,xlab="Quantile level",ylab="Bayesian p-value",
+     cex.lab=1.5,cex.axis=1.5,ylim=0:1)
+
