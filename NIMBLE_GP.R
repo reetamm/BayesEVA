@@ -139,4 +139,19 @@ dev.off()
 plot(tau,pval,xlab="Quantile level",ylab="Bayesian p-value",
      cex.lab=1.5,cex.axis=1.5,ylim=0:1)
 
-
+rlperiods = 2:100
+rlvalues = matrix(NA,2000,99)
+for(i in 1:2000){
+    rlvalues[i,] = rlevd(rlperiods, scale=samps[i,1], shape=samps[i,2], type = 'GP', threshold = qq)    
+}
+rl_upper = apply(rlvalues, 2, quantile,0.975)
+rl_lower = apply(rlvalues, 2, quantile,0.025)
+rl_mean = apply(rlvalues, 2, mean)
+pdf(file='plots/RL_GP.pdf',width=6,height = 5)
+par(mar = c(5,5,2,1))
+plot(x=rlperiods,y=rl_mean,type = 'l',ylim = c(min(rl_lower),max(rl_upper)), 
+     xlab = 'Years', ylab = 'Return level',cex.axis=1.5,cex.lab=1.5 )
+lines(x=rlperiods, rl_lower,lty=2,col='grey')
+lines(x=rlperiods, rl_upper,lty=2,col='grey')
+par(mar = c(5,5,5,5))
+dev.off()
