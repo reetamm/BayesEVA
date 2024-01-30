@@ -86,7 +86,7 @@ par(mfrow=c(1,1))
 
 
 #
-n   <- 10000              # Number of observations
+n   <- 100              # Number of observations
 S   <- 2000             # Number of MCMC samples
 Y   <- FortMax$Prec
 indx = sample(1:20000,2000)
@@ -112,7 +112,7 @@ for(j in 1:nt){pval[j]<-mean(Qp[,j]>Q[j])}
 # Plot PPD
 pdf(file='plots/PPD_GEV.pdf',width=6,height = 5)
 par(mar = c(5,5,2,1))
-boxplot(t(Qp)~tau,outline=FALSE,ylim=range(Qp),
+boxplot(t(Qp)~tau,outline=FALSE,ylim=c(0.45,5),
         cex.axis=1.5,cex.lab=1.5,
         xlab="Quantile level",ylab="Posterior predictive distribution")
 points(Q,pch=19,col='blue',cex=0.5)
@@ -134,8 +134,8 @@ rl_lower = apply(rlvalues, 2, quantile,0.025)
 rl_mean = apply(rlvalues, 2, mean)
 pdf(file='plots/RL_GEV.pdf',width=6,height = 5)
 par(mar = c(5,5,2,1))
-plot(x=rlperiods,y=rl_mean,type = 'l',ylim = c(min(rl_lower),max(rl_upper)), 
-     xlab = 'Years', ylab = 'Return level',cex.axis=1.5,cex.lab=1.5 )
+plot(x=rlperiods,y=rl_mean,type = 'l',ylim = c(1.15,8), 
+     xlab = 'Years (n)', ylab = 'Return level',cex.axis=1.5,cex.lab=1.5 )
 lines(x=rlperiods, rl_lower,lty=2,col='grey')
 lines(x=rlperiods, rl_upper,lty=2,col='grey')
 par(mar = c(5,5,5,5))
